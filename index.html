@@ -4,30 +4,95 @@
     <title>Friendly Scrabble Hunters</title>
     <script src="https://www.gstatic.com/firebasejs/7.21.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/7.21.0/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
   </head>
   <body>
-    <h1>Welcome to Super Text Twist</h1>
+    <input id="guesses">
+    <div id="game">
+      <h1>Demo</h1>
+      <button id="start">Click To Start</button>
+    </div>
     <script>
 var firebaseConfig = {
-  apiKey: "AIzaSyCIq0B0a4k1K7TZy_rEBGIffIqA9E85cWU",
-  authDomain: "lightningwords-73f3b.firebaseapp.com",
-  databaseURL: "https://lightningwords-73f3b.firebaseio.com",
-  projectId: "lightningwords-73f3b",
-  storageBucket: "lightningwords-73f3b.appspot.com",
-  messagingSenderId: "395895975569",
-  appId: "1:395895975569:web:bbac10684955b83e93d930"
-};
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+    apiKey: "AIzaSyCIq0B0a4k1K7TZy_rEBGIffIqA9E85cWU",
+    authDomain: "lightningwords-73f3b.firebaseapp.com",
+    databaseURL: "https://lightningwords-73f3b.firebaseio.com",
+    projectId: "lightningwords-73f3b",
+    storageBucket: "lightningwords-73f3b.appspot.com",
+    messagingSenderId: "395895975569",
+    appId: "1:395895975569:web:bbac10684955b83e93d930"
+  };
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  let myDatabase = firebase.database();
 
-let myDatabase = firebase.database();
-myDatabase.ref("dictionary").child("numstarters").once('value', ss=>{
-  let rackcount = parseInt(ss.val());
-  let randomrack = parseInt(Math.floor(rackcount*Math.random()));
-  myDatabase.ref("dictionary").child("starters").child(randomrack).once('value', ss2=>{
-    alert(ss2.val());
+let gameData = {};
+
+myDatabase.ref("running").on("value", ss=>{
+  let status = ss.val();
+  if (status == 1){
+    $("#start").attr("disabled", true);
+    myDatabase.ref("activeGame").on("value", ss=>{
+      updateGame(ss.val());
+    });
+  } else {
+    restart();
+  }
+});
+
+let restart = function(){
+
+  $("#game").html(`<h1>Demo</h1>
+  <button id="start">Click To Start</button>`);
+
+$("#start").click(function(){
+  myDatabase.ref("running").set(1);
+  myDatabase.ref("dictionary").child("numstarters").once('value', ss=>{
+    let rackcount = parseInt(ss.val());
+    let randomrack = parseInt(Math.floor(rackcount*Math.random()));
+    myDatabase.ref("dictionary").child("starters").child(randomrack).once('value', ss2=>{
+      let rack = ss2.val();
+      myDatabase.ref("dictionary").child("alphabetized").child(rack).once('value', ss3=>{
+        let words = ss3.val();
+        let gameData = {rack: rack, words: words};
+        myDatabase.ref("activeGame").set(gameData);
+      });
+    });
+  })  
+});
+
+}
+
+let updateGame = function(remotegameData){
+  gameData = remotegameData;
+  let correct = gameData.correct || [];
+  $("#game").html(`
+  <h1>${gameData.rack}</h1>
+  <h2>${correct.length} / ${gameData.words.length}</h2>
+  <h3>So far:</h3>
+  <ul id="sofar">
+  </ul>
+`);
+  correct.map(word=>{
+    $("#sofar").append(`<li>${word}</li>`);
   });
-})
+  if (correct.length == gameData.words.length){
+    myDatabase.ref("running").set(0);
+  }
+};
+
+$("#guesses").keyup(function(){
+  let guess = $("#guesses").val();
+  let answers = gameData.words || [];
+  if (answers.indexOf(guess) > -1){
+    if (gameData.hasOwnProperty("correct")){
+      gameData.correct.push(guess);
+    } else {
+      gameData.correct = [guess];
+    }
+    myDatabase.ref("activeGame").child('correct').set(gameData.correct);
+  }
+});
     </script>
   </body>
 </html>
